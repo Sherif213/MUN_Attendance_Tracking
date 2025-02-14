@@ -41,21 +41,25 @@ $currentDate = $currentDateTime->format('Y-m-d');
 $currentTime = $currentDateTime->format('H:i:s');
 
 // Determine the current session based on time
-$session = null;
-if ($currentTime >= '09:00:00' && $currentTime < '11:00:00') {
-    $session = 'session1';
-} elseif ($currentTime >= '14:00:00' && $currentTime < '14:30:00') {
-    $session = 'session2';
-} elseif ($currentTime >= '16:00:00' && $currentTime < '16:30:00') {
-    $session = 'session3';
-} elseif ($currentTime >= '17:30:00' && $currentTime < '18:00:00') {
-    $session = 'session4';
-} elseif ($currentTime >= '17:10:00' && $currentTime < '17:40:00') {
-    $session = 'session5';
-} else {
+$config = require __DIR__ . '/../config/config.php';
+$sessions = $config['sessions'];
+
+function getCurrentSession($currentTime, $sessions)
+{
+    foreach ($sessions as $session => $time) {
+        if ($currentTime >= $time['start'] && $currentTime < $time['end']) {
+            return $session;
+        }
+    }
+    return null;
+}
+
+$session = getCurrentSession($currentTime, $sessions);
+if (!$session) {
     echo json_encode(['success' => false, 'message' => 'No active session at this time.']);
     exit;
 }
+
 
 try {
     // Check if the user exists and fetch their committee
