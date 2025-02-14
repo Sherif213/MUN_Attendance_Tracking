@@ -12,7 +12,7 @@ import {
 import { CheckCircle, Cancel } from "@mui/icons-material";
 
 const AttendanceForm = () => {
-  const [formData, setFormData] = useState({ id: "", playcard: "", code: "" });
+  const [formData, setFormData] = useState({ id: "", code: "" });
   const [errors, setErrors] = useState({});
   const [attendance, setAttendance] = useState({
     session1: false,
@@ -22,18 +22,6 @@ const AttendanceForm = () => {
     session5: false,
   });
   const [submitted, setSubmitted] = useState(false);
-  const [dateTime, setDateTime] = useState(
-    new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul" })
-  );
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDateTime(
-        new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul" })
-      );
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -42,18 +30,17 @@ const AttendanceForm = () => {
   const validateForm = () => {
     let newErrors = {};
     if (!formData.id) newErrors.id = "ID is required";
-    if (!formData.playcard) newErrors.playcard = "Placard is required";
     if (!formData.code) newErrors.code = "Code on Board is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleCheckAttendance = async () => {
-    if (!formData.id || !formData.playcard) {
-      alert("Please enter ID and Placard to check attendance.");
+    if (!formData.id) {
+      alert("Please enter ID to check attendance.");
       return;
     }
-
+    const today = new Date().toISOString().split("T")[0];
     try {
       const response = await fetch(
         "https://afaqenterprise.com/api/check_attendance.php",
@@ -62,16 +49,11 @@ const AttendanceForm = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             id: formData.id,
-            play_card: formData.playcard,
+            date: today,
           }),
         }
       );
-      console.log("Request Payload:", {
-        id: formData.id,
-        play_card: formData.playcard,
-      });
       const result = await response.json();
-      console.log("Server Response:", result);
       if (result.success) {
         setAttendance(result.attendance);
       } else {
@@ -92,7 +74,10 @@ const AttendanceForm = () => {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
+            body: JSON.stringify({
+              id: formData.id,
+              code: formData.code,
+            }),
           }
         );
         const result = await response.json();
@@ -100,7 +85,7 @@ const AttendanceForm = () => {
           setAttendance(result.attendance);
           setSubmitted(true);
         } else {
-          alert("Invalid ID or Placard. Please try again.");
+          alert("Invalid ID. Please try again.");
         }
       } catch (error) {
         console.error("Error submitting form:", error);
@@ -169,14 +154,6 @@ const AttendanceForm = () => {
       >
         <CardContent>
           <Typography
-            variant="h6"
-            gutterBottom
-            align="center"
-            sx={{ fontWeight: "bold", color: "#555" }}
-          >
-            {dateTime}
-          </Typography>
-          <Typography
             variant="h4"
             gutterBottom
             align="center"
@@ -223,17 +200,6 @@ const AttendanceForm = () => {
               onChange={handleChange}
               error={!!errors.id}
               helperText={errors.id}
-              margin="normal"
-              variant="outlined"
-            />
-            <TextField
-              fullWidth
-              label="Placard"
-              name="playcard"
-              value={formData.playcard}
-              onChange={handleChange}
-              error={!!errors.playcard}
-              helperText={errors.playcard}
               margin="normal"
               variant="outlined"
             />
