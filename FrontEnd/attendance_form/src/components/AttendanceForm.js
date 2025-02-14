@@ -5,7 +5,7 @@ import { CheckCircle, Cancel } from "@mui/icons-material";
 const AttendanceForm = () => {
   const [formData, setFormData] = useState({ id: "", playcard: "", code: "" });
   const [errors, setErrors] = useState({});
-  const [attendance, setAttendance] = useState({ session1: false, session2: false, session3: false });
+  const [attendance, setAttendance] = useState({ session1: false, session2: false, session3: false , session4: false, session5: false});
   const [submitted, setSubmitted] = useState(false);
   const [dateTime, setDateTime] = useState(new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul" }));
 
@@ -23,27 +23,51 @@ const AttendanceForm = () => {
   const validateForm = () => {
     let newErrors = {};
     if (!formData.id) newErrors.id = "ID is required";
-    if (!formData.playcard) newErrors.playcard = "Playcard is required";
+    if (!formData.playcard) newErrors.playcard = "Placard is required";
     if (!formData.code) newErrors.code = "Code on Board is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCheckAttendance = async () => {
+    if (!formData.id || !formData.playcard) {
+      alert("Please enter ID and Placard to check attendance.");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://aqua-snail-799722.hostingersite.com/api/check_attendance.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: formData.id, playcard: formData.playcard }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setAttendance(result.attendance);
+      } else {
+        alert("No attendance record found.");
+      }
+    } catch (error) {
+      console.error("Error fetching attendance:", error);
+      alert("Error connecting to server. Try again later.");
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
       try {
-        const response = await fetch("https://your-hostinger-domain.com/verify_attendance.php", {
+        const response = await fetch("http://aqua-snail-799722.hostingersite.com/api/submit_attendance.php", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),
         });
         const result = await response.json();
         if (result.success) {
-          setAttendance({ ...attendance, session1: true });
+          setAttendance(result.attendance);
           setSubmitted(true);
         } else {
-          alert("Invalid ID or Playcard. Please try again.");
+          alert("Invalid ID or Placard. Please try again.");
         }
       } catch (error) {
         console.error("Error submitting form:", error);
@@ -79,7 +103,7 @@ const AttendanceForm = () => {
           <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: "bold", color: "#1976D2" }}>
             Attendance Form
           </Typography>
-          <Divider sx={{ my: 2 }} />
+          <Divider sx={{ my: 3 }} />
           <Grid container spacing={2} justifyContent="center">
             {Object.keys(attendance).map((session, index) => (
               <Grid item xs={4} key={index} sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -104,7 +128,7 @@ const AttendanceForm = () => {
             />
             <TextField
               fullWidth
-              label="Playcard"
+              label="Placard"
               name="playcard"
               value={formData.playcard}
               onChange={handleChange}
@@ -128,6 +152,9 @@ const AttendanceForm = () => {
               Submit Attendance
             </Button>
           </form>
+          <Button onClick={handleCheckAttendance} variant="outlined" color="secondary" fullWidth sx={{ mt: 2, py: 1.5, fontSize: "1rem" }}>
+            Check Attendance
+          </Button>
         </CardContent>
       </Card>
     </Container>
