@@ -41,25 +41,37 @@ $currentDate = $currentDateTime->format('Y-m-d');
 $currentTime = $currentDateTime->format('H:i:s');
 
 // Determine the current session based on time
-$config = require __DIR__ . '/../config/config.php';
-$sessions = $config['sessions'];
+$sessions = [
+    'session1' => ['09:00:00', '10:30:00'],
+    'session2' => ['11:00:00', '11:30:00'],
+    'session3' => ['22:00:00', '22:20:00'],
+    'session4' => ['22:30:00', '01:00:00'],
+    'session5' => ['02:10:00', '03:40:00'],
+];
 
-function getCurrentSession($currentTime, $sessions)
-{
-    foreach ($sessions as $session => $time) {
-        if ($currentTime >= $time['start'] && $currentTime < $time['end']) {
-            return $session;
-        }
+// Function to check if the current time falls within a session range
+function isTimeInRange($currentTime, $startTime, $endTime) {
+    // Handle midnight crossover (e.g., 22:35:00 to 00:00:00)
+    if ($startTime > $endTime) {
+        return ($currentTime >= $startTime || $currentTime < $endTime);
     }
-    return null;
+    return ($currentTime >= $startTime && $currentTime < $endTime);
 }
 
-$session = getCurrentSession($currentTime, $sessions);
-if (!$session) {
+// Determine the active session
+$activeSession = null;
+foreach ($sessions as $session => $times) {
+    list($startTime, $endTime) = $times;
+    if (isTimeInRange($currentTime, $startTime, $endTime)) {
+        $activeSession = $session;
+        break; // Exit the loop once the active session is found
+    }
+}
+
+if (!$activeSession) {
     echo json_encode(['success' => false, 'message' => 'No active session at this time.']);
     exit;
 }
-
 
 try {
     // Check if the user exists and fetch their committee
@@ -69,79 +81,69 @@ try {
     $stmt->bindParam(':playcard', $playcard, PDO::PARAM_STR);
     $stmt->execute();
 
-    if ($stmt->rowCount() > 0) {
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        $userId = $row['id'];
-        $committee = $row['committee'];
+    if ($stmt->rowCount() === 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid ID or Playcard.']);
+        exit;
+    }
 
-        // Fetch the valid code for the committee and session
-        $codeSql = "SELECT {$session}_code AS valid_code FROM committee_codes WHERE committee = :committee AND date = :currentDate";
-        $codeStmt = $conn->prepare($codeSql);
-        $codeStmt->bindParam(':committee', $committee, PDO::PARAM_STR);
-        $codeStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
-        $codeStmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $userId = $row['id'];
+    $committee = $row['committee'];
 
-        if ($codeStmt->rowCount() > 0) {
-            $codeRow = $codeStmt->fetch(PDO::FETCH_ASSOC);
-            $validCode = $codeRow['valid_code'];
+    // Fetch the valid code for the committee and session
+    $codeSql = "SELECT {$activeSession}_code AS valid_code FROM committee_codes WHERE committee = :committee AND date = :currentDate";
+    $codeStmt = $conn->prepare($codeSql);
+    $codeStmt->bindParam(':committee', $committee, PDO::PARAM_STR);
+    $codeStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
+    $codeStmt->execute();
 
-            // Validate the code
-            if ($code !== $validCode) {
-                echo json_encode(['success' => false, 'message' => 'Invalid code for this session.']);
-                exit;
-            }
+    if ($codeStmt->rowCount() === 0) {
+        echo json_encode(['success' => false, 'message' => 'No valid code found for this committee and session.']);
+        exit;
+    }
 
-            // Check if attendance record for today already exists
-            $attendanceSql = "SELECT * FROM attendance WHERE user_id = :userId AND date = :currentDate";
-            $attendanceStmt = $conn->prepare($attendanceSql);
-            $attendanceStmt->bindParam(':userId', $userId, PDO::PARAM_STR);
-            $attendanceStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
-            $attendanceStmt->execute();
+    $codeRow = $codeStmt->fetch(PDO::FETCH_ASSOC);
+    $validCode = $codeRow['valid_code'];
 
-            if ($attendanceStmt->rowCount() > 0) {
-                // Update existing attendance record for the current session
-                $updateSql = "UPDATE attendance SET $session = 1 WHERE user_id = :userId AND date = :currentDate";
-                $updateStmt = $conn->prepare($updateSql);
-                $updateStmt->bindParam(':userId', $userId, PDO::PARAM_STR);
-                $updateStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
-                $updateStmt->execute();
+    // Validate the code
+    if ($code !== $validCode) {
+        echo json_encode(['success' => false, 'message' => 'Invalid code for this session.']);
+        exit;
+    }
 
-                if ($updateStmt->rowCount() > 0) {
-                    echo json_encode(['success' => true, 'attendance' => [
-                        'session1' => true,
-                        'session2' => true,
-                        'session3' => true,
-                        'session4' => true,
-                        'session5' => true
-                    ]]);
-                } else {
-                    echo json_encode(['success' => false, 'message' => 'Failed to mark attendance.']);
-                }
-            } else {
-                // Insert new attendance record for the current session
-                $insertSql = "INSERT INTO attendance (user_id, date, $session) VALUES (:userId, :currentDate, 1)";
-                $insertStmt = $conn->prepare($insertSql);
-                $insertStmt->bindParam(':userId', $userId, PDO::PARAM_STR);
-                $insertStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
-                $insertStmt->execute();
+    // Check if attendance record for today already exists
+    $attendanceSql = "SELECT * FROM attendance WHERE user_id = :userId AND date = :currentDate";
+    $attendanceStmt = $conn->prepare($attendanceSql);
+    $attendanceStmt->bindParam(':userId', $userId, PDO::PARAM_STR);
+    $attendanceStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
+    $attendanceStmt->execute();
 
-                if ($insertStmt->rowCount() > 0) {
-                    echo json_encode(['success' => true, 'attendance' => [
-                        'session1' => true,
-                        'session2' => true,
-                        'session3' => true,
-                        'session4' => true,
-                        'session5' => true
-                    ]]);
-                } else {
-                    echo json_encode(['success' => false, 'message' => 'Failed to mark attendance.']);
-                }
-            }
+    if ($attendanceStmt->rowCount() > 0) {
+        // Update existing attendance record for the current session
+        $updateSql = "UPDATE attendance SET $activeSession = 1 WHERE user_id = :userId AND date = :currentDate";
+        $updateStmt = $conn->prepare($updateSql);
+        $updateStmt->bindParam(':userId', $userId, PDO::PARAM_STR);
+        $updateStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
+        $updateStmt->execute();
+
+        if ($updateStmt->rowCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'Attendance marked successfully.']);
         } else {
-            echo json_encode(['success' => false, 'message' => 'No valid code found for this committee and session.']);
+            echo json_encode(['success' => false, 'message' => 'Failed to mark attendance.']);
         }
     } else {
-        echo json_encode(['success' => false, 'message' => 'Invalid ID or Playcard.']);
+        // Insert new attendance record for the current session
+        $insertSql = "INSERT INTO attendance (user_id, date, $activeSession) VALUES (:userId, :currentDate, 1)";
+        $insertStmt = $conn->prepare($insertSql);
+        $insertStmt->bindParam(':userId', $userId, PDO::PARAM_STR);
+        $insertStmt->bindParam(':currentDate', $currentDate, PDO::PARAM_STR);
+        $insertStmt->execute();
+
+        if ($insertStmt->rowCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'Attendance marked successfully.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to mark attendance.']);
+        }
     }
 } catch (PDOException $e) {
     error_log("Database error: " . $e->getMessage());

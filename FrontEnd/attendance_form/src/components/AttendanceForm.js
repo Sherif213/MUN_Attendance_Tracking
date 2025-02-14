@@ -66,12 +66,12 @@ const AttendanceForm = () => {
           }),
         }
       );
-      // console.log("Request Payload:", {
-      //   id: formData.id,
-      //   play_card: formData.playcard,
-      // });
+      console.log("Request Payload:", {
+        id: formData.id,
+        play_card: formData.playcard,
+      });
       const result = await response.json();
-      // console.log("Server Response:", result);
+      console.log("Server Response:", result);
       if (result.success) {
         setAttendance(result.attendance);
       } else {
