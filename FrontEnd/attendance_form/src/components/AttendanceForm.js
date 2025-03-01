@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+
 import {
   TextField,
   Button,
@@ -8,262 +9,107 @@ import {
   Card,
   CardContent,
   Divider,
+  Box,
+  Chip
 } from "@mui/material";
 import { CheckCircle, Cancel } from "@mui/icons-material";
+import { styled, keyframes } from "@mui/system";
+
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const StyledCard = styled(Card)(({ theme }) => ({
+  animation: `${fadeIn} 0.5s ease-in-out`,
+  borderRadius: "16px",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+  background: "linear-gradient(145deg, #ffffff, #f0f0f0)",
+  backdropFilter: "blur(10px)",
+  border: "1px solid rgba(255, 255, 255, 0.3)",
+  overflow: "hidden",
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  borderRadius: "12px",
+  padding: "12px 24px",
+  fontWeight: "bold",
+  transition: "all 0.3s ease",
+  "&:hover": {
+    transform: "translateY(-2px)",
+    boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
+  },
+}));
+
+const ClockContainer = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: "20px",
+}));
+
+const DigitalTime = styled(Typography)(({ theme }) => ({
+  fontSize: "1.5rem",
+  fontWeight: "bold",
+  color: "#1976D2",
+  marginTop: "10px",
+}));
 
 const AttendanceForm = () => {
-  const [formData, setFormData] = useState({ id: "", playcard: "", code: "" });
+  const [formData, setFormData] = useState({ id: "", code: "" });
   const [errors, setErrors] = useState({});
   const [attendance, setAttendance] = useState({
     session1: false,
     session2: false,
     session3: false,
-    session4: false,
-    session5: false,
+
   });
   const [submitted, setSubmitted] = useState(false);
-  const [dateTime, setDateTime] = useState(
-    new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul" })
-  );
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const canvasRef = useRef(null);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDateTime(
-        new Date().toLocaleString("en-GB", { timeZone: "Europe/Istanbul" })
-      );
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
-
-  const validateForm = () => {
-    let newErrors = {};
-    if (!formData.id) newErrors.id = "ID is required";
-    if (!formData.playcard) newErrors.playcard = "Placard is required";
-    if (!formData.code) newErrors.code = "Code on Board is required";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleCheckAttendance = async () => {
-    if (!formData.id || !formData.playcard) {
-      alert("Please enter ID and Placard to check attendance.");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        "https://afaqenterprise.com/api/check_attendance.php",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: formData.id,
-            playcard: formData.playcard,
-          }),
-        }
-      );
-      const result = await response.json();
-      if (result.success) {
-        setAttendance(result.attendance);
-      } else {
-        alert("No attendance record found.");
-      }
-    } catch (error) {
-      console.error("Error fetching attendance:", error);
-      alert("Error connecting to server. Try again later.");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (validateForm()) {
-      try {
-        const response = await fetch(
-          "https://afaqenterprise.com/api/submit_attendance.php",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
-          }
-        );
-        const result = await response.json();
-        if (result.success) {
-          setAttendance(result.attendance);
-          setSubmitted(true);
-        } else {
-          alert("Invalid ID or Placard. Please try again.");
-        }
-      } catch (error) {
-        console.error("Error submitting form:", error);
-        alert("Error connecting to server. Try again later.");
-      }
-    }
-  };
-
-  if (submitted) {
-    return (
-      <Container
-        maxWidth="md"
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          mt: 5,
-        }}
-      >
-        <Card
-          sx={{
-            p: 3,
-            boxShadow: 3,
-            borderRadius: 3,
-            width: "100%",
-            maxWidth: 600,
-            bgcolor: "#ffffff",
-          }}
-        >
-          <CardContent>
-            <Typography
-              variant="h4"
-              align="center"
-              sx={{ fontWeight: "bold", color: "#1976D2" }}
-            >
-              Thank You for Submitting!
-            </Typography>
-            <Typography variant="h6" align="center" sx={{ color: "#555" }}>
-              Your attendance has been recorded.
-            </Typography>
-          </CardContent>
-        </Card>
-      </Container>
-    );
-  }
 
   return (
-    <Container
-      maxWidth="md"
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        mt: 5,
-      }}
-    >
-      <Card
-        sx={{
-          p: 3,
-          boxShadow: 3,
-          borderRadius: 3,
-          width: "100%",
-          maxWidth: 600,
-          bgcolor: "#ffffff",
-        }}
-      >
-        <CardContent>
-          <Typography
-            variant="h6"
-            gutterBottom
-            align="center"
-            sx={{ fontWeight: "bold", color: "#555" }}
-          >
-            {dateTime}
-          </Typography>
-          <Typography
-            variant="h4"
-            gutterBottom
-            align="center"
-            sx={{ fontWeight: "bold", color: "#1976D2" }}
-          >
-            Attendance Form
-          </Typography>
+    <Container maxWidth="md" sx={{ display: "flex", flexDirection: "column", alignItems: "center", mt: 5 }}>
+      {/* Modern Clock */}
+      <ClockContainer>
+        <DigitalTime>{formatTime(currentTime)}</DigitalTime>
+      </ClockContainer>
+
+      <StyledCard sx={{ p: 3, width: "100%", maxWidth: 600 }}>
+      <CardContent>
+          <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: "bold", color: "#1976D2" }}>Attendance Form</Typography>
           <Divider sx={{ my: 3 }} />
-          <Grid container spacing={2} justifyContent="center">
+          <Box sx={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 1, mb: 3 }}>
             {Object.keys(attendance).map((session, index) => (
-              <Grid
-                item
-                xs={4}
+              <Chip
                 key={index}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Typography
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    fontWeight: "bold",
-                  }}
-                >
-                  {session.replace("session", "Session ")}:
-                  {attendance[session] ? (
-                    <CheckCircle color="success" sx={{ ml: 1 }} />
-                  ) : (
-                    <Cancel color="error" sx={{ ml: 1 }} />
-                  )}
-                </Typography>
-              </Grid>
+                label={session.replace("session", "Session ")}
+                icon={attendance[session] ? <CheckCircle color="success" /> : <Cancel color="error" />}
+                sx={{ fontSize: "1rem", fontWeight: "bold", padding: "10px 15px", borderRadius: "8px", boxShadow: "0px 4px 10px rgba(0,0,0,0.1)" }}
+                color={attendance[session] ? "success" : "error"}
+              />
             ))}
-          </Grid>
-          <form onSubmit={handleSubmit} style={{ marginTop: 20 }}>
-            <TextField
-              fullWidth
-              label="ID"
-              name="id"
-              value={formData.id}
-              onChange={handleChange}
-              error={!!errors.id}
-              helperText={errors.id}
-              margin="normal"
-              variant="outlined"
-            />
-            <TextField
-              fullWidth
-              label="Placard"
-              name="playcard"
-              value={formData.playcard}
-              onChange={handleChange}
-              error={!!errors.playcard}
-              helperText={errors.playcard}
-              margin="normal"
-              variant="outlined"
-            />
-            <TextField
-              fullWidth
-              label="Code on Board"
-              name="code"
-              value={formData.code}
-              onChange={handleChange}
-              error={!!errors.code}
-              helperText={errors.code}
-              margin="normal"
-              variant="outlined"
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              fullWidth
-              sx={{ mt: 2, py: 1.5, fontSize: "1rem" }}
-            >
-              Submit Attendance
-            </Button>
+          </Box>
+          <form>
+            <TextField fullWidth label="ID" name="id" value={formData.id} onChange={(e) => setFormData({ ...formData, id: e.target.value })} margin="normal" variant="outlined" />
+            <TextField fullWidth label="Code on Board" name="code" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} margin="normal" variant="outlined" />
+            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ mt: 2, py: 1.5, fontSize: "1rem" }}>Submit Attendance</Button>
           </form>
-          <Button
-            onClick={handleCheckAttendance}
-            variant="outlined"
-            color="secondary"
-            fullWidth
-            sx={{ mt: 2, py: 1.5, fontSize: "1rem" }}
-          >
-            Check Attendance
-          </Button>
         </CardContent>
-      </Card>
+      </StyledCard>
     </Container>
   );
 };
